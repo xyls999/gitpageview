@@ -1,0 +1,834 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GitHub 数据看板 - xyls999</title>
+<script src="chart.js"></script>
+<style>
+:root{--primary:#3b82f6;--secondary:#8b5cf6;--success:#10b981;--warning:#f59e0b;--danger:#ef4444;--info:#06b6d4;--bg:#0b1120;--card:#151e32;--border:#2d3a52;--text:#f8fafc;--muted:#94a3b8;}
+*{margin:0;padding:0;box-sizing:border-box;}
+body{font-family:"Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--text);line-height:1.6;}
+.container{max-width:1500px;margin:0 auto;padding:24px;}
+header{position:relative;padding:50px 40px;border-radius:24px;margin-bottom:32px;overflow:hidden;background:linear-gradient(135deg,rgba(59,130,246,0.15),rgba(139,92,246,0.15));border:1px solid rgba(255,255,255,0.08);}
+header::before{content:"";position:absolute;top:0;left:0;right:0;height:3px;background:linear-gradient(90deg,var(--primary),var(--secondary));}
+header h1{font-size:2.8rem;font-weight:700;background:linear-gradient(135deg,var(--primary),var(--secondary));-webkit-background-clip:text;-webkit-text-fill-color:transparent;}
+header .subtitle{color:var(--muted);font-size:1.1rem;margin-top:8px;display:flex;gap:24px;flex-wrap:wrap;}
+header .live-dot{width:8px;height:8px;background:var(--success);border-radius:50%;display:inline-block;animation:pulse 2s infinite;}
+@keyframes pulse{0%,100%{opacity:1;box-shadow:0 0 0 0 rgba(16,185,129,0.4);}50%{opacity:0.8;box-shadow:0 0 0 8px rgba(16,185,129,0);}}
+.stats-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:20px;margin-bottom:32px;}
+.stat-card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:24px;position:relative;overflow:hidden;transition:all 0.3s ease;}
+.stat-card:hover{transform:translateY(-4px);border-color:rgba(59,130,246,0.3);box-shadow:0 20px 40px rgba(0,0,0,0.3);}
+.stat-card::before{content:"";position:absolute;top:0;left:0;width:100%;height:3px;}
+.stat-card:nth-child(1)::before{background:linear-gradient(90deg,var(--primary),var(--secondary));}
+.stat-card:nth-child(2)::before{background:linear-gradient(90deg,var(--info),var(--primary));}
+.stat-card:nth-child(3)::before{background:linear-gradient(90deg,var(--success),var(--info));}
+.stat-card:nth-child(4)::before{background:linear-gradient(90deg,var(--warning),var(--danger));}
+.stat-card:nth-child(5)::before{background:linear-gradient(90deg,var(--primary),var(--success));}
+.stat-card:nth-child(6)::before{background:linear-gradient(90deg,var(--secondary),var(--danger));}
+.stat-card .icon{width:48px;height:48px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.5rem;margin-bottom:16px;}
+.stat-card:nth-child(1) .icon{background:rgba(59,130,246,0.1);}
+.stat-card:nth-child(2) .icon{background:rgba(6,182,212,0.1);}
+.stat-card:nth-child(3) .icon{background:rgba(139,92,246,0.1);}
+.stat-card:nth-child(4) .icon{background:rgba(245,158,11,0.1);}
+.stat-card:nth-child(5) .icon{background:rgba(16,185,129,0.1);}
+.stat-card:nth-child(6) .icon{background:rgba(239,68,68,0.1);}
+.stat-card .number{font-size:2.2rem;font-weight:700;line-height:1;}
+.stat-card .label{color:var(--muted);font-size:0.9rem;margin-top:6px;}
+.stat-card .trend{font-size:0.8rem;margin-top:8px;color:var(--success);}
+.charts-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(400px,1fr));gap:24px;margin-bottom:32px;}
+.chart-card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:24px;position:relative;overflow:hidden;}
+.chart-card::before{content:"";position:absolute;top:0;left:20px;width:60px;height:3px;background:linear-gradient(90deg,var(--primary),var(--secondary));border-radius:0 0 4px 4px;}
+.chart-card h3{font-size:1.1rem;font-weight:600;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+.chart-container{width:100%;height:320px;}
+.chart-card.wide{grid-column:span 2;}
+@media(max-width:900px){.chart-card.wide{grid-column:span 1;}}
+.wordcloud-container{width:100%;height:320px;position:relative;overflow:hidden;}
+.wordcloud-word{position:absolute;white-space:nowrap;font-weight:700;cursor:pointer;transition:all 0.3s ease;opacity:0.85;}
+.wordcloud-word:hover{opacity:1;transform:scale(1.15);z-index:100;filter:brightness(1.3);}
+.contrib-section{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:24px;margin-bottom:32px;}
+.contrib-section h3{font-size:1.1rem;font-weight:600;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+.contrib-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;flex-wrap:wrap;gap:16px;}
+.contrib-stats{display:flex;gap:24px;}
+.contrib-stat{text-align:center;}
+.contrib-stat .value{font-size:1.5rem;font-weight:700;color:var(--success);}
+.contrib-stat .label{font-size:0.8rem;color:var(--muted);}
+.contrib-legend{display:flex;align-items:center;gap:6px;font-size:0.8rem;color:var(--muted);}
+.contrib-legend .box{width:12px;height:12px;border-radius:3px;}
+.contrib-grid{display:flex;gap:3px;overflow-x:auto;padding-bottom:8px;}
+.contrib-week{display:flex;flex-direction:column;gap:3px;}
+.contrib-day{width:14px;height:14px;border-radius:3px;transition:transform 0.2s;cursor:pointer;}
+.contrib-day:hover{transform:scale(1.4);z-index:10;position:relative;}
+.contrib-tooltip{position:fixed;background:rgba(0,0,0,0.9);color:#fff;padding:6px 10px;border-radius:6px;font-size:0.8rem;pointer-events:none;z-index:1000;display:none;white-space:nowrap;border:1px solid var(--border);}
+.table-section{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:24px;margin-bottom:32px;overflow:hidden;}
+.table-header{display:flex;justify-content:space-between;align-items:center;margin-bottom:20px;flex-wrap:wrap;gap:16px;}
+.table-header h3{font-size:1.1rem;font-weight:600;display:flex;align-items:center;gap:10px;}
+.table-search{display:flex;gap:10px;align-items:center;}
+.table-search input,.table-search select{background:var(--bg);border:1px solid var(--border);border-radius:10px;padding:10px 16px;color:var(--text);font-size:0.9rem;outline:none;}
+.table-search input:focus,.table-search select:focus{border-color:var(--primary);box-shadow:0 0 0 3px rgba(59,130,246,0.1);}
+.table-wrapper{overflow-x:auto;border-radius:12px;border:1px solid var(--border);}
+.data-table{width:100%;border-collapse:separate;border-spacing:0;font-size:0.88rem;min-width:1000px;}
+.data-table th{background:linear-gradient(135deg,#1e3a5f,#2d3a52);color:var(--text);padding:14px 16px;text-align:left;font-weight:600;position:sticky;top:0;white-space:nowrap;cursor:pointer;user-select:none;}
+.data-table th:first-child{border-radius:12px 0 0 0;}
+.data-table th:last-child{border-radius:0 12px 0 0;}
+.data-table td{padding:12px 16px;border-bottom:1px solid var(--border);transition:all 0.2s;}
+.data-table tbody tr:hover{background:#1e293b;}
+.data-table tbody tr:last-child td:first-child{border-radius:0 0 0 12px;}
+.data-table tbody tr:last-child td:last-child{border-radius:0 0 12px 0;}
+.data-table tbody tr:last-child td{border-bottom:none;}
+.tag{display:inline-flex;align-items:center;padding:4px 12px;border-radius:20px;font-size:0.78rem;font-weight:600;}
+.tag-original{background:rgba(16,185,129,0.15);color:#34d399;border:1px solid rgba(16,185,129,0.3);}
+.tag-fork{background:rgba(245,158,11,0.15);color:#fbbf24;border:1px solid rgba(245,158,11,0.3);}
+.lang-badge{display:inline-flex;align-items:center;gap:6px;padding:4px 10px;border-radius:8px;font-size:0.8rem;font-weight:500;background:rgba(59,130,246,0.1);color:#60a5fa;border:1px solid rgba(59,130,246,0.2);}
+.lang-dot{width:8px;height:8px;border-radius:50%;}
+.stars-badge{display:inline-flex;align-items:center;gap:4px;color:#fbbf24;font-weight:600;font-size:0.9rem;}
+.metric-bar{height:6px;border-radius:3px;background:var(--bg);overflow:hidden;min-width:60px;}
+.metric-bar-fill{height:100%;border-radius:3px;background:linear-gradient(90deg,var(--primary),var(--secondary));}
+.row-link{color:var(--primary);text-decoration:none;font-weight:500;}
+.row-link:hover{color:var(--secondary);text-decoration:underline;}
+footer{text-align:center;padding:40px 20px;color:var(--muted);font-size:0.9rem;border-top:1px solid var(--border);margin-top:20px;}
+::-webkit-scrollbar{width:8px;height:8px;}
+::-webkit-scrollbar-track{background:var(--bg);}
+::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px;}
+::-webkit-scrollbar-thumb:hover{background:#4a5568;}
+@keyframes fadeInUp{from{opacity:0;transform:translateY(20px);}to{opacity:1;transform:translateY(0);}}
+.animate-in{animation:fadeInUp 0.6s ease forwards;opacity:0;}
+</style>
+</head>
+<body>
+<div class="contrib-tooltip" id="tooltip"></div>
+<div class="container">
+<header class="animate-in">
+<h1>🚀 GitHub 数据运营看板</h1>
+<div class="subtitle">
+<span>👤 账号: xyls999</span>
+<span>📅 统计周期: 2025.10 - 2026.04</span>
+<span>📦 仓库总数: 30</span>
+<span><span class="live-dot"></span> 实时数据</span>
+</div>
+</header>
+<section class="stats-grid">
+<div class="stat-card animate-in"><div class="icon">📦</div><div class="number">30</div><div class="label">仓库总数</div><div class="trend">↑ 30 个内容</div></div>
+<div class="stat-card animate-in"><div class="icon">✨</div><div class="number">15</div><div class="label">原创内容</div><div class="trend">↑ 占比 50%</div></div>
+<div class="stat-card animate-in"><div class="icon">🍴</div><div class="number">15</div><div class="label">Fork 项目</div><div class="trend">↑ 学习整理类</div></div>
+<div class="stat-card animate-in"><div class="icon">⭐</div><div class="number">23</div><div class="label">总 Stars</div><div class="trend">↑ 累计获星</div></div>
+<div class="stat-card animate-in"><div class="icon">🐛</div><div class="number">2</div><div class="label">总 Issues</div><div class="trend">↑ 活跃讨论</div></div>
+<div class="stat-card animate-in"><div class="icon">🔄</div><div class="number">5</div><div class="label">总 PRs</div><div class="trend">↑ 代码贡献</div></div>
+</section>
+<section class="charts-row">
+<div class="chart-card wide animate-in">
+<h3>🔥 仓库创建 & PR/Issue 贡献热力图 (近一年)</h3>
+<div id="contribChart" style="width:100%;height:180px;"></div>
+<div style="display:flex;justify-content:space-between;align-items:center;margin-top:12px;flex-wrap:wrap;gap:12px;">
+<div class="contrib-stats">
+<div class="contrib-stat"><div class="value">37</div><div class="label">总贡献</div></div>
+<div class="contrib-stat"><div class="value">3</div><div class="label">最长连续活跃(天)</div></div>
+<div class="contrib-stat"><div class="value">26</div><div class="label">活跃天数</div></div>
+</div>
+<div class="contrib-legend"><span>少</span><div class="box" style="background:#161b22;"></div><div class="box" style="background:#0e4429;"></div><div class="box" style="background:#006d32;"></div><div class="box" style="background:#26a641;"></div><div class="box" style="background:#39d353;"></div><span>多</span></div>
+</div>
+</div>
+</section>
+<section class="charts-row">
+<div class="chart-card animate-in">
+<h3>☁️ 仓库关键词词云</h3>
+<div class="wordcloud-container" id="wordcloudContainer"></div>
+</div>
+<div class="chart-card animate-in">
+<h3>📊 内容类型 & 活跃度雷达</h3>
+<div class="chart-container"><canvas id="radarChart"></canvas></div>
+</div>
+</section>
+<section class="charts-row">
+<div class="chart-card animate-in">
+<h3>💻 编程语言分布 (玫瑰图)</h3>
+<div class="chart-container"><canvas id="langChart"></canvas></div>
+</div>
+<div class="chart-card animate-in">
+<h3>📅 月度发布趋势 & 模拟访客量</h3>
+<div class="chart-container"><canvas id="trendChart"></canvas></div>
+</div>
+</section>
+<section class="charts-row">
+<div class="chart-card animate-in">
+<h3>🔥 Stars 排行榜</h3>
+<div class="chart-container"><canvas id="starChart"></canvas></div>
+</div>
+<div class="chart-card animate-in">
+<h3>📦 仓库大小排行 (Top 15)</h3>
+<div class="chart-container"><canvas id="sizeChart"></canvas></div>
+</div>
+</section>
+<section class="charts-row">
+<div class="chart-card animate-in">
+<h3>📆 星期分布偏好</h3>
+<div class="chart-container"><canvas id="weekdayChart"></canvas></div>
+</div>
+<div class="chart-card animate-in">
+<h3>🏷️ Topics 标签分布</h3>
+<div class="chart-container"><canvas id="topicChart"></canvas></div>
+</div>
+</section>
+<section class="table-section animate-in">
+<div class="table-header">
+<h3>📋 高级仓库数据表</h3>
+<div class="table-search">
+<select id="typeFilter"><option value="all">全部类型</option><option value="原创">原创内容</option><option value="Fork">Fork项目</option></select>
+<input type="text" id="searchInput" placeholder="🔍 搜索仓库名、描述...">
+</div>
+</div>
+<div class="table-wrapper">
+<table class="data-table" id="repoTable">
+<thead>
+<tr>
+<th onclick="sortTable(0)">序号 ↕</th>
+<th onclick="sortTable(1)">仓库名 ↕</th>
+<th onclick="sortTable(2)">类型 ↕</th>
+<th onclick="sortTable(3)">创建日期 ↕</th>
+<th onclick="sortTable(4)">语言 ↕</th>
+<th onclick="sortTable(5)">Stars ↕</th>
+<th onclick="sortTable(6)">Forks ↕</th>
+<th onclick="sortTable(7)">Issues ↕</th>
+<th onclick="sortTable(8)">PRs ↕</th>
+<th onclick="sortTable(9)">活跃度 ↕</th>
+<th>简介</th>
+</tr>
+</thead>
+<tbody id="tableBody">
+<tr data-type="原创" data-search="zhize-lab-blog 个人博客项目，记录技术学习与生活点滴 xyls的博客">
+<td>#01</td>
+<td><a href="https://github.com/xyls999/zhize-lab-blog" target="_blank" class="row-link">zhize-lab-blog</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2025-10-31</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#f1e05a;"></span>JavaScript</span></td>
+<td><span class="stars-badge">⭐ 1</span></td>
+<td>0</td>
+<td>1</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:60%;"></div></div></td>
+<td>个人博客项目，记录技术学习与生活点滴</td>
+</tr>
+<tr data-type="原创" data-search="roscar-first ros智能小车项目第一版，用于智慧社区场景 ros小车项目(简陋，智慧社区)">
+<td>#02</td>
+<td><a href="https://github.com/xyls999/roscar-first" target="_blank" class="row-link">roscar-first</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2025-11-21</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#427819;"></span>Makefile</span></td>
+<td><span class="stars-badge">⭐ 2</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:60%;"></div></div></td>
+<td>ROS智能小车项目第一版，用于智慧社区场景</td>
+</tr>
+<tr data-type="原创" data-search="math-code 数学相关代码实践与算法实现 hiv">
+<td>#03</td>
+<td><a href="https://github.com/xyls999/math-code" target="_blank" class="row-link">math-code</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2025-12-03</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#3572A5;"></span>Python</span></td>
+<td><span class="stars-badge">⭐ 1</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:40%;"></div></div></td>
+<td>数学相关代码实践与算法实现</td>
+</tr>
+<tr data-type="原创" data-search="roscar-second ros智能小车项目第二版升级版 原神nb">
+<td>#04</td>
+<td><a href="https://github.com/xyls999/roscar-second" target="_blank" class="row-link">roscar-second</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2026-01-11</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#3572A5;"></span>Python</span></td>
+<td><span class="stars-badge">⭐ 2</span></td>
+<td>0</td>
+<td>1</td>
+<td>1</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:100%;"></div></div></td>
+<td>ROS智能小车项目第二版升级版</td>
+</tr>
+<tr data-type="原创" data-search="wechat-manage 微信小程序后台管理系统 暂无描述">
+<td>#05</td>
+<td><a href="https://github.com/xyls999/wechat-manage" target="_blank" class="row-link">wechat-manage</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2026-02-10</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#3572A5;"></span>Python</span></td>
+<td><span class="stars-badge">⭐ 1</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:40%;"></div></div></td>
+<td>微信小程序后台管理系统</td>
+</tr>
+<tr data-type="原创" data-search="app-wechat-page 微信小程序前端页面项目 暂无描述">
+<td>#06</td>
+<td><a href="https://github.com/xyls999/app-wechat-page" target="_blank" class="row-link">app-wechat-page</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2026-02-10</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#41b883;"></span>Vue</span></td>
+<td><span class="stars-badge">⭐ 1</span></td>
+<td>0</td>
+<td>0</td>
+<td>3</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:100%;"></div></div></td>
+<td>微信小程序前端页面项目</td>
+</tr>
+<tr data-type="原创" data-search="java-spring-boot-data 基于spring boot的数据处理后端服务 暂无描述">
+<td>#07</td>
+<td><a href="https://github.com/xyls999/java-spring-boot-data" target="_blank" class="row-link">java-spring-boot-data</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2026-02-15</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 1</span></td>
+<td>0</td>
+<td>0</td>
+<td>1</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:60%;"></div></div></td>
+<td>基于Spring Boot的数据处理后端服务</td>
+</tr>
+<tr data-type="原创" data-search="java-web-news java web新闻发布系统 暂无描述">
+<td>#08</td>
+<td><a href="https://github.com/xyls999/java-web-news" target="_blank" class="row-link">java-web-news</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2026-02-19</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#b07219;"></span>Java</span></td>
+<td><span class="stars-badge">⭐ 1</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:40%;"></div></div></td>
+<td>Java Web新闻发布系统</td>
+</tr>
+<tr data-type="原创" data-search="new-web-java 新版java web前端项目 暂无描述">
+<td>#09</td>
+<td><a href="https://github.com/xyls999/new-web-java" target="_blank" class="row-link">new-web-java</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2026-02-19</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#41b883;"></span>Vue</span></td>
+<td><span class="stars-badge">⭐ 1</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:40%;"></div></div></td>
+<td>新版Java Web前端项目</td>
+</tr>
+<tr data-type="原创" data-search="new-springboot-zhizelab 新版智泽实验室spring boot后端 暂无描述">
+<td>#10</td>
+<td><a href="https://github.com/xyls999/new-springboot-zhizelab" target="_blank" class="row-link">new-springboot-zhizelab</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2026-02-20</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 1</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:40%;"></div></div></td>
+<td>新版智泽实验室Spring Boot后端</td>
+</tr>
+<tr data-type="原创" data-search="web-zhizelabwithbackend-xyls 智泽实验室web全栈项目 暂无描述">
+<td>#11</td>
+<td><a href="https://github.com/xyls999/web-zhizelabwithbackend-xyls" target="_blank" class="row-link">web-zhizelabwithbackend-xyls</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2026-02-21</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#f1e05a;"></span>JavaScript</span></td>
+<td><span class="stars-badge">⭐ 1</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:40%;"></div></div></td>
+<td>智泽实验室Web全栈项目</td>
+</tr>
+<tr data-type="原创" data-search="java-zhizelab-backend-xyls 智泽实验室java后端服务 暂无描述">
+<td>#12</td>
+<td><a href="https://github.com/xyls999/java-zhizelab-backend-xyls" target="_blank" class="row-link">java-zhizelab-backend-xyls</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2026-02-21</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#b07219;"></span>Java</span></td>
+<td><span class="stars-badge">⭐ 1</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:40%;"></div></div></td>
+<td>智泽实验室Java后端服务</td>
+</tr>
+<tr data-type="原创" data-search="cs-review 计算机科学知识复习整理仓库 我不知道他们的名字 但我知道他们的故事">
+<td>#13</td>
+<td><a href="https://github.com/xyls999/cs-review" target="_blank" class="row-link">cs-review</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2026-02-25</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#b07219;"></span>Java</span></td>
+<td><span class="stars-badge">⭐ 2</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:60%;"></div></div></td>
+<td>计算机科学知识复习整理仓库</td>
+</tr>
+<tr data-type="原创" data-search="xyls-smartgroup-clash clash mihomo智能分组配置方案 a yaml to use smartgroup to adjust mihomo">
+<td>#14</td>
+<td><a href="https://github.com/xyls999/xyls-smartgroup-clash" target="_blank" class="row-link">xyls-smartgroup-clash</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2026-03-24</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 2</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:60%;"></div></div></td>
+<td>Clash Mihomo智能分组配置方案</td>
+</tr>
+<tr data-type="Fork" data-search="openclaw 【fork】your own personal ai assistant. any os. any platform. the lobster way. 🦞 your own personal ai assistant. any os. any platform. the lobster way. 🦞">
+<td>#15</td>
+<td><a href="https://github.com/xyls999/openclaw" target="_blank" class="row-link">openclaw</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-03-27</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 1</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:40%;"></div></div></td>
+<td>【Fork】Your own personal AI assistant. Any OS. Any Platform. The lobster way. 🦞</td>
+</tr>
+<tr data-type="Fork" data-search="spring-boot-projects 【fork】:fire: 该仓库中主要是 spring boot 的入门学习教程以及一些常用的 spring boot 实战项目教程，包括 spring boot 使用的各种示例代码，同时也包括一些实战项目的项目源码和效果展示，实战项目包括基本的 web 开发以及目前大家普遍使用的线上博客项目/企业大型商城系统/前后端分离实践项目等，摆脱各种 hello world 入门案例的束缚，真正的掌握 spring boot 开发。 :fire: 该仓库中主要是 spring boot 的入门学习教程以及一些常用的 spring boot 实战项目教程，包括 spring boot 使用的各种示例代码，同时也包括一些实战项目的项目源码和效果展示，实战项目包括基本的 web 开发以及目前大家普遍使用的线上博客项目/企业大型商城系统/前后端分离实践项目等，摆脱各种 hello world 入门案例的束缚，真正的掌握 spring boot 开发。">
+<td>#16</td>
+<td><a href="https://github.com/xyls999/spring-boot-projects" target="_blank" class="row-link">spring-boot-projects</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-03-27</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 1</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:40%;"></div></div></td>
+<td>【Fork】:fire: 该仓库中主要是 Spring Boot 的入门学习教程以及一些常用的 Spring Boot 实战项目教程，包括 Spring Boot 使用的各种示例代码，同时也包括一些实战项目的项目源码和效果展示，实战项目包括基本的 web 开发以及目前大家普遍使用的线上博客项目/企业大型商城系统/前后端分离实践项目等，摆脱各种 hello world 入门案例的束缚，真正的掌握 Spring Boot 开发。</td>
+</tr>
+<tr data-type="Fork" data-search="pretext 【fork】pretext: an authoring and publishing system for scholarly documents pretext: an authoring and publishing system for scholarly documents">
+<td>#17</td>
+<td><a href="https://github.com/xyls999/pretext" target="_blank" class="row-link">pretext</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-03-31</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 0</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:20%;"></div></div></td>
+<td>【Fork】PreTeXt: an authoring and publishing system for scholarly documents</td>
+</tr>
+<tr data-type="Fork" data-search="pretext2 【fork】暂无描述 暂无描述">
+<td>#18</td>
+<td><a href="https://github.com/xyls999/pretext2" target="_blank" class="row-link">pretext2</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-03-31</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 2</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:60%;"></div></div></td>
+<td>【Fork】暂无描述</td>
+</tr>
+<tr data-type="原创" data-search="chiken-detect 小鸡/动物目标检测项目 暂无描述">
+<td>#19</td>
+<td><a href="https://github.com/xyls999/chiken-detect" target="_blank" class="row-link">chiken-detect</a></td>
+<td><span class="tag tag-original">原创</span></td>
+<td>2026-04-01</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#c6538c;"></span>SCSS</span></td>
+<td><span class="stars-badge">⭐ 0</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:20%;"></div></div></td>
+<td>小鸡/动物目标检测项目</td>
+</tr>
+<tr data-type="Fork" data-search="claude-code-sourcemap 【fork】暂无描述 暂无描述">
+<td>#20</td>
+<td><a href="https://github.com/xyls999/claude-code-sourcemap" target="_blank" class="row-link">claude-code-sourcemap</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-04-02</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 1</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:40%;"></div></div></td>
+<td>【Fork】暂无描述</td>
+</tr>
+<tr data-type="Fork" data-search="yolo_deepstream 【fork】yolo model qat and deploy with deepstream&tensorrt yolo model qat and deploy with deepstream&tensorrt">
+<td>#21</td>
+<td><a href="https://github.com/xyls999/yolo_deepstream" target="_blank" class="row-link">yolo_deepstream</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-04-06</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 0</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:20%;"></div></div></td>
+<td>【Fork】yolo model qat and deploy with deepstream&tensorrt</td>
+</tr>
+<tr data-type="Fork" data-search="kuiperinfer 【fork】校招、秋招、春招、实习好项目！带你从零实现一个高性能的深度学习推理库，支持大模型 llama2 、unet、yolov5、resnet等模型的推理。implement a high-performance deep learning inference library step by step 校招、秋招、春招、实习好项目！带你从零实现一个高性能的深度学习推理库，支持大模型 llama2 、unet、yolov5、resnet等模型的推理。implement a high-performance deep learning inference library step by step">
+<td>#22</td>
+<td><a href="https://github.com/xyls999/KuiperInfer" target="_blank" class="row-link">KuiperInfer</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-04-16</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 0</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:20%;"></div></div></td>
+<td>【Fork】校招、秋招、春招、实习好项目！带你从零实现一个高性能的深度学习推理库，支持大模型 llama2 、Unet、Yolov5、Resnet等模型的推理。Implement a high-performance deep learning inference library step by step</td>
+</tr>
+<tr data-type="Fork" data-search="yu-ai-agent 【fork】编程导航 2025 年 ai 开发实战新项目，基于 spring boot 3 + java 21 + spring ai 构建 ai 恋爱大师应用和 react 模式自主规划智能体yumanus，覆盖 ai 大模型接入、spring ai 核心特性、prompt 工程和优化、rag 检索增强、向量数据库、tool calling 工具调用、mcp 模型上下文协议、ai agent 开发（manas java 实现）、cursor ai 工具等核心知识。用一套教程将程序员必知必会的 ai 技术一网打尽，帮你成为 ai 时代企业的香饽饽，给你的简历和求职大幅增加竞争力。 编程导航 2025 年 ai 开发实战新项目，基于 spring boot 3 + java 21 + spring ai 构建 ai 恋爱大师应用和 react 模式自主规划智能体yumanus，覆盖 ai 大模型接入、spring ai 核心特性、prompt 工程和优化、rag 检索增强、向量数据库、tool calling 工具调用、mcp 模型上下文协议、ai agent 开发（manas java 实现）、cursor ai 工具等核心知识。用一套教程将程序员必知必会的 ai 技术一网打尽，帮你成为 ai 时代企业的香饽饽，给你的简历和求职大幅增加竞争力。">
+<td>#23</td>
+<td><a href="https://github.com/xyls999/yu-ai-agent" target="_blank" class="row-link">yu-ai-agent</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-04-16</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 0</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:20%;"></div></div></td>
+<td>【Fork】编程导航 2025 年 AI 开发实战新项目，基于 Spring Boot 3 + Java 21 + Spring AI 构建 AI 恋爱大师应用和 ReAct 模式自主规划智能体YuManus，覆盖 AI 大模型接入、Spring AI 核心特性、Prompt 工程和优化、RAG 检索增强、向量数据库、Tool Calling 工具调用、MCP 模型上下文协议、AI Agent 开发（Manas Java 实现）、Cursor AI 工具等核心知识。用一套教程将程序员必知必会的 AI 技术一网打尽，帮你成为 AI 时代企业的香饽饽，给你的简历和求职大幅增加竞争力。</td>
+</tr>
+<tr data-type="Fork" data-search="sillytavern 【fork】llm frontend for power users. llm frontend for power users.">
+<td>#24</td>
+<td><a href="https://github.com/xyls999/SillyTavern" target="_blank" class="row-link">SillyTavern</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-04-19</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 0</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:20%;"></div></div></td>
+<td>【Fork】LLM Frontend for Power Users.</td>
+</tr>
+<tr data-type="Fork" data-search="cloud-sms 【fork】短信云轰炸，可以用于离线轰炸骗子手机号 短信云轰炸，可以用于离线轰炸骗子手机号">
+<td>#25</td>
+<td><a href="https://github.com/xyls999/Cloud-Sms" target="_blank" class="row-link">Cloud-Sms</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-04-20</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 0</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:20%;"></div></div></td>
+<td>【Fork】短信云轰炸，可以用于离线轰炸骗子手机号</td>
+</tr>
+<tr data-type="Fork" data-search="paddle 【fork】parallel distributed deep learning: machine learning framework from industrial practice （『飞桨』核心框架，深度学习&机器学习高性能单机、分布式训练和跨平台部署） parallel distributed deep learning: machine learning framework from industrial practice （『飞桨』核心框架，深度学习&机器学习高性能单机、分布式训练和跨平台部署）">
+<td>#26</td>
+<td><a href="https://github.com/xyls999/Paddle" target="_blank" class="row-link">Paddle</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-04-20</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 0</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:20%;"></div></div></td>
+<td>【Fork】PArallel Distributed Deep LEarning: Machine Learning Framework from Industrial Practice （『飞桨』核心框架，深度学习&机器学习高性能单机、分布式训练和跨平台部署）</td>
+</tr>
+<tr data-type="Fork" data-search="vnt 【fork】an efficient vpn. 简便高效的异地组网、内网穿透工具 an efficient vpn. 简便高效的异地组网、内网穿透工具">
+<td>#27</td>
+<td><a href="https://github.com/xyls999/vnt" target="_blank" class="row-link">vnt</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-04-21</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 0</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:20%;"></div></div></td>
+<td>【Fork】An efficient VPN. 简便高效的异地组网、内网穿透工具</td>
+</tr>
+<tr data-type="Fork" data-search="old-code 【fork】古法编程skill(重磅开源！震撼首发！) 古法编程skill(重磅开源！震撼首发！)">
+<td>#28</td>
+<td><a href="https://github.com/xyls999/old-code" target="_blank" class="row-link">old-code</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-04-23</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 0</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:20%;"></div></div></td>
+<td>【Fork】古法编程Skill(重磅开源！震撼首发！)</td>
+</tr>
+<tr data-type="Fork" data-search="hallo2 【fork】[iclr 2025] hallo2: long-duration and high-resolution audio-driven portrait image animation [iclr 2025] hallo2: long-duration and high-resolution audio-driven portrait image animation">
+<td>#29</td>
+<td><a href="https://github.com/xyls999/hallo2" target="_blank" class="row-link">hallo2</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-04-23</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 0</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:20%;"></div></div></td>
+<td>【Fork】[ICLR 2025] Hallo2: Long-Duration and High-Resolution Audio-driven Portrait Image Animation</td>
+</tr>
+<tr data-type="Fork" data-search="vllm 【fork】a high-throughput and memory-efficient inference and serving engine for llms a high-throughput and memory-efficient inference and serving engine for llms">
+<td>#30</td>
+<td><a href="https://github.com/xyls999/vllm" target="_blank" class="row-link">vllm</a></td>
+<td><span class="tag tag-fork">Fork</span></td>
+<td>2026-04-24</td>
+<td><span class="lang-badge"><span class="lang-dot" style="background:#8b949e;"></span>未识别</span></td>
+<td><span class="stars-badge">⭐ 0</span></td>
+<td>0</td>
+<td>0</td>
+<td>0</td>
+<td><div class="metric-bar"><div class="metric-bar-fill" style="width:20%;"></div></div></td>
+<td>【Fork】A high-throughput and memory-efficient inference and serving engine for LLMs</td>
+</tr>
+</tbody>
+</table>
+</div>
+</section>
+<footer>
+<p>🛠️ Generated by xyls999 | GitHub Data Dashboard | 基于 GitHub 导出数据构建 | 2026</p>
+<p style="margin-top:8px;font-size:0.8rem;opacity:0.7;">使用 Chart.js 驱动可视化 | 深色主题自适应设计</p>
+</footer>
+</div>
+<script>
+function renderWordCloud() {
+  const container = document.getElementById("wordcloudContainer");
+  const data = [{"name": "暂无描述", "value": 11, "size": 40}, {"name": "ai", "value": 11, "size": 40}, {"name": "spring", "value": 9, "size": 39}, {"name": "boot", "value": 7, "size": 33}, {"name": "java", "value": 6, "size": 30}, {"name": "web", "value": 4, "size": 24}, {"name": "code", "value": 3, "size": 21}, {"name": "xyls", "value": 3, "size": 21}, {"name": "pretext", "value": 3, "size": 21}, {"name": "high", "value": 3, "size": 21}, {"name": "learning", "value": 3, "size": 21}, {"name": "roscar", "value": 2, "size": 18}, {"name": "wechat", "value": 2, "size": 18}, {"name": "zhizelab", "value": 2, "size": 18}, {"name": "smartgroup", "value": 2, "size": 18}, {"name": "to", "value": 2, "size": 18}, {"name": "开发", "value": 2, "size": 18}, {"name": "an", "value": 2, "size": 18}, {"name": "yolo", "value": 2, "size": 18}, {"name": "deepstream", "value": 2, "size": 18}, {"name": "deep", "value": 2, "size": 18}, {"name": "inference", "value": 2, "size": 18}, {"name": "step", "value": 2, "size": 18}, {"name": "agent", "value": 2, "size": 18}, {"name": "efficient", "value": 2, "size": 18}, {"name": "hallo", "value": 2, "size": 18}, {"name": "zhize", "value": 1, "size": 15}, {"name": "lab", "value": 1, "size": 15}, {"name": "blog", "value": 1, "size": 15}, {"name": "xyls的博客", "value": 1, "size": 15}, {"name": "first", "value": 1, "size": 15}, {"name": "ros小车项目", "value": 1, "size": 15}, {"name": "简陋", "value": 1, "size": 15}, {"name": "智慧社区", "value": 1, "size": 15}, {"name": "math", "value": 1, "size": 15}, {"name": "hiv", "value": 1, "size": 15}, {"name": "second", "value": 1, "size": 15}, {"name": "原神nb", "value": 1, "size": 15}, {"name": "manage", "value": 1, "size": 15}, {"name": "app", "value": 1, "size": 15}, {"name": "page", "value": 1, "size": 15}, {"name": "data", "value": 1, "size": 15}, {"name": "news", "value": 1, "size": 15}, {"name": "springboot", "value": 1, "size": 15}, {"name": "zhizelabwithbackend", "value": 1, "size": 15}, {"name": "backend", "value": 1, "size": 15}, {"name": "cs", "value": 1, "size": 15}, {"name": "review", "value": 1, "size": 15}, {"name": "我不知道他们的名字", "value": 1, "size": 15}, {"name": "但我知道他们的故事", "value": 1, "size": 15}, {"name": "clash", "value": 1, "size": 15}, {"name": "yaml", "value": 1, "size": 15}, {"name": "adjust", "value": 1, "size": 15}, {"name": "mihomo", "value": 1, "size": 15}, {"name": "openclaw", "value": 1, "size": 15}, {"name": "own", "value": 1, "size": 15}, {"name": "personal", "value": 1, "size": 15}, {"name": "assistant", "value": 1, "size": 15}, {"name": "os", "value": 1, "size": 15}, {"name": "platform", "value": 1, "size": 15}];
+  const colors = ["#3b82f6","#8b5cf6","#10b981","#06b6d4","#f59e0b","#ef4444","#ec4899","#60a5fa","#a78bfa","#34d399"];
+  const w = container.clientWidth;
+  const h = container.clientHeight;
+  data.forEach((item, idx) => {
+    const el = document.createElement("span");
+    el.className = "wordcloud-word";
+    el.textContent = item.name;
+    el.style.fontSize = item.size + "px";
+    el.style.color = colors[idx % colors.length];
+    const angle = idx * 0.7;
+    const radius = Math.sqrt(idx) * 18;
+    const x = w/2 + Math.cos(angle) * radius - item.name.length * item.size / 4;
+    const y = h/2 + Math.sin(angle) * radius * 0.6;
+    el.style.left = Math.max(0, Math.min(w-50, x)) + "px";
+    el.style.top = Math.max(0, Math.min(h-30, y)) + "px";
+    container.appendChild(el);
+  });
+}
+renderWordCloud();
+function renderContrib() {
+  const data = [{"date": "2025-04-27", "count": 0}, {"date": "2025-04-28", "count": 0}, {"date": "2025-04-29", "count": 0}, {"date": "2025-04-30", "count": 0}, {"date": "2025-05-01", "count": 0}, {"date": "2025-05-02", "count": 0}, {"date": "2025-05-03", "count": 0}, {"date": "2025-05-04", "count": 0}, {"date": "2025-05-05", "count": 0}, {"date": "2025-05-06", "count": 0}, {"date": "2025-05-07", "count": 0}, {"date": "2025-05-08", "count": 0}, {"date": "2025-05-09", "count": 0}, {"date": "2025-05-10", "count": 0}, {"date": "2025-05-11", "count": 0}, {"date": "2025-05-12", "count": 0}, {"date": "2025-05-13", "count": 0}, {"date": "2025-05-14", "count": 0}, {"date": "2025-05-15", "count": 0}, {"date": "2025-05-16", "count": 0}, {"date": "2025-05-17", "count": 0}, {"date": "2025-05-18", "count": 0}, {"date": "2025-05-19", "count": 0}, {"date": "2025-05-20", "count": 0}, {"date": "2025-05-21", "count": 0}, {"date": "2025-05-22", "count": 0}, {"date": "2025-05-23", "count": 0}, {"date": "2025-05-24", "count": 0}, {"date": "2025-05-25", "count": 0}, {"date": "2025-05-26", "count": 0}, {"date": "2025-05-27", "count": 0}, {"date": "2025-05-28", "count": 0}, {"date": "2025-05-29", "count": 0}, {"date": "2025-05-30", "count": 0}, {"date": "2025-05-31", "count": 0}, {"date": "2025-06-01", "count": 0}, {"date": "2025-06-02", "count": 0}, {"date": "2025-06-03", "count": 0}, {"date": "2025-06-04", "count": 0}, {"date": "2025-06-05", "count": 0}, {"date": "2025-06-06", "count": 0}, {"date": "2025-06-07", "count": 0}, {"date": "2025-06-08", "count": 0}, {"date": "2025-06-09", "count": 0}, {"date": "2025-06-10", "count": 0}, {"date": "2025-06-11", "count": 0}, {"date": "2025-06-12", "count": 0}, {"date": "2025-06-13", "count": 0}, {"date": "2025-06-14", "count": 0}, {"date": "2025-06-15", "count": 0}, {"date": "2025-06-16", "count": 0}, {"date": "2025-06-17", "count": 0}, {"date": "2025-06-18", "count": 0}, {"date": "2025-06-19", "count": 0}, {"date": "2025-06-20", "count": 0}, {"date": "2025-06-21", "count": 0}, {"date": "2025-06-22", "count": 0}, {"date": "2025-06-23", "count": 0}, {"date": "2025-06-24", "count": 0}, {"date": "2025-06-25", "count": 0}, {"date": "2025-06-26", "count": 0}, {"date": "2025-06-27", "count": 0}, {"date": "2025-06-28", "count": 0}, {"date": "2025-06-29", "count": 0}, {"date": "2025-06-30", "count": 0}, {"date": "2025-07-01", "count": 0}, {"date": "2025-07-02", "count": 0}, {"date": "2025-07-03", "count": 0}, {"date": "2025-07-04", "count": 0}, {"date": "2025-07-05", "count": 0}, {"date": "2025-07-06", "count": 0}, {"date": "2025-07-07", "count": 0}, {"date": "2025-07-08", "count": 0}, {"date": "2025-07-09", "count": 0}, {"date": "2025-07-10", "count": 0}, {"date": "2025-07-11", "count": 0}, {"date": "2025-07-12", "count": 0}, {"date": "2025-07-13", "count": 0}, {"date": "2025-07-14", "count": 0}, {"date": "2025-07-15", "count": 0}, {"date": "2025-07-16", "count": 0}, {"date": "2025-07-17", "count": 0}, {"date": "2025-07-18", "count": 0}, {"date": "2025-07-19", "count": 0}, {"date": "2025-07-20", "count": 0}, {"date": "2025-07-21", "count": 0}, {"date": "2025-07-22", "count": 0}, {"date": "2025-07-23", "count": 0}, {"date": "2025-07-24", "count": 0}, {"date": "2025-07-25", "count": 0}, {"date": "2025-07-26", "count": 0}, {"date": "2025-07-27", "count": 0}, {"date": "2025-07-28", "count": 0}, {"date": "2025-07-29", "count": 0}, {"date": "2025-07-30", "count": 0}, {"date": "2025-07-31", "count": 0}, {"date": "2025-08-01", "count": 0}, {"date": "2025-08-02", "count": 0}, {"date": "2025-08-03", "count": 0}, {"date": "2025-08-04", "count": 0}, {"date": "2025-08-05", "count": 0}, {"date": "2025-08-06", "count": 0}, {"date": "2025-08-07", "count": 0}, {"date": "2025-08-08", "count": 0}, {"date": "2025-08-09", "count": 0}, {"date": "2025-08-10", "count": 0}, {"date": "2025-08-11", "count": 0}, {"date": "2025-08-12", "count": 0}, {"date": "2025-08-13", "count": 0}, {"date": "2025-08-14", "count": 0}, {"date": "2025-08-15", "count": 0}, {"date": "2025-08-16", "count": 0}, {"date": "2025-08-17", "count": 0}, {"date": "2025-08-18", "count": 0}, {"date": "2025-08-19", "count": 0}, {"date": "2025-08-20", "count": 0}, {"date": "2025-08-21", "count": 0}, {"date": "2025-08-22", "count": 0}, {"date": "2025-08-23", "count": 0}, {"date": "2025-08-24", "count": 0}, {"date": "2025-08-25", "count": 0}, {"date": "2025-08-26", "count": 0}, {"date": "2025-08-27", "count": 0}, {"date": "2025-08-28", "count": 0}, {"date": "2025-08-29", "count": 0}, {"date": "2025-08-30", "count": 0}, {"date": "2025-08-31", "count": 0}, {"date": "2025-09-01", "count": 0}, {"date": "2025-09-02", "count": 0}, {"date": "2025-09-03", "count": 0}, {"date": "2025-09-04", "count": 0}, {"date": "2025-09-05", "count": 0}, {"date": "2025-09-06", "count": 0}, {"date": "2025-09-07", "count": 0}, {"date": "2025-09-08", "count": 0}, {"date": "2025-09-09", "count": 0}, {"date": "2025-09-10", "count": 0}, {"date": "2025-09-11", "count": 0}, {"date": "2025-09-12", "count": 0}, {"date": "2025-09-13", "count": 0}, {"date": "2025-09-14", "count": 0}, {"date": "2025-09-15", "count": 0}, {"date": "2025-09-16", "count": 0}, {"date": "2025-09-17", "count": 0}, {"date": "2025-09-18", "count": 0}, {"date": "2025-09-19", "count": 0}, {"date": "2025-09-20", "count": 0}, {"date": "2025-09-21", "count": 0}, {"date": "2025-09-22", "count": 0}, {"date": "2025-09-23", "count": 0}, {"date": "2025-09-24", "count": 0}, {"date": "2025-09-25", "count": 0}, {"date": "2025-09-26", "count": 0}, {"date": "2025-09-27", "count": 0}, {"date": "2025-09-28", "count": 0}, {"date": "2025-09-29", "count": 0}, {"date": "2025-09-30", "count": 0}, {"date": "2025-10-01", "count": 0}, {"date": "2025-10-02", "count": 0}, {"date": "2025-10-03", "count": 0}, {"date": "2025-10-04", "count": 0}, {"date": "2025-10-05", "count": 0}, {"date": "2025-10-06", "count": 0}, {"date": "2025-10-07", "count": 0}, {"date": "2025-10-08", "count": 0}, {"date": "2025-10-09", "count": 0}, {"date": "2025-10-10", "count": 0}, {"date": "2025-10-11", "count": 0}, {"date": "2025-10-12", "count": 0}, {"date": "2025-10-13", "count": 0}, {"date": "2025-10-14", "count": 0}, {"date": "2025-10-15", "count": 0}, {"date": "2025-10-16", "count": 0}, {"date": "2025-10-17", "count": 0}, {"date": "2025-10-18", "count": 0}, {"date": "2025-10-19", "count": 0}, {"date": "2025-10-20", "count": 0}, {"date": "2025-10-21", "count": 0}, {"date": "2025-10-22", "count": 0}, {"date": "2025-10-23", "count": 0}, {"date": "2025-10-24", "count": 0}, {"date": "2025-10-25", "count": 0}, {"date": "2025-10-26", "count": 0}, {"date": "2025-10-27", "count": 0}, {"date": "2025-10-28", "count": 0}, {"date": "2025-10-29", "count": 0}, {"date": "2025-10-30", "count": 0}, {"date": "2025-10-31", "count": 1}, {"date": "2025-11-01", "count": 0}, {"date": "2025-11-02", "count": 0}, {"date": "2025-11-03", "count": 0}, {"date": "2025-11-04", "count": 0}, {"date": "2025-11-05", "count": 0}, {"date": "2025-11-06", "count": 0}, {"date": "2025-11-07", "count": 0}, {"date": "2025-11-08", "count": 0}, {"date": "2025-11-09", "count": 0}, {"date": "2025-11-10", "count": 0}, {"date": "2025-11-11", "count": 0}, {"date": "2025-11-12", "count": 0}, {"date": "2025-11-13", "count": 0}, {"date": "2025-11-14", "count": 0}, {"date": "2025-11-15", "count": 0}, {"date": "2025-11-16", "count": 0}, {"date": "2025-11-17", "count": 0}, {"date": "2025-11-18", "count": 0}, {"date": "2025-11-19", "count": 0}, {"date": "2025-11-20", "count": 0}, {"date": "2025-11-21", "count": 1}, {"date": "2025-11-22", "count": 0}, {"date": "2025-11-23", "count": 0}, {"date": "2025-11-24", "count": 0}, {"date": "2025-11-25", "count": 0}, {"date": "2025-11-26", "count": 0}, {"date": "2025-11-27", "count": 0}, {"date": "2025-11-28", "count": 0}, {"date": "2025-11-29", "count": 0}, {"date": "2025-11-30", "count": 0}, {"date": "2025-12-01", "count": 0}, {"date": "2025-12-02", "count": 0}, {"date": "2025-12-03", "count": 1}, {"date": "2025-12-04", "count": 0}, {"date": "2025-12-05", "count": 0}, {"date": "2025-12-06", "count": 0}, {"date": "2025-12-07", "count": 0}, {"date": "2025-12-08", "count": 0}, {"date": "2025-12-09", "count": 0}, {"date": "2025-12-10", "count": 0}, {"date": "2025-12-11", "count": 0}, {"date": "2025-12-12", "count": 0}, {"date": "2025-12-13", "count": 0}, {"date": "2025-12-14", "count": 0}, {"date": "2025-12-15", "count": 0}, {"date": "2025-12-16", "count": 0}, {"date": "2025-12-17", "count": 0}, {"date": "2025-12-18", "count": 0}, {"date": "2025-12-19", "count": 0}, {"date": "2025-12-20", "count": 0}, {"date": "2025-12-21", "count": 0}, {"date": "2025-12-22", "count": 0}, {"date": "2025-12-23", "count": 0}, {"date": "2025-12-24", "count": 0}, {"date": "2025-12-25", "count": 0}, {"date": "2025-12-26", "count": 0}, {"date": "2025-12-27", "count": 0}, {"date": "2025-12-28", "count": 0}, {"date": "2025-12-29", "count": 0}, {"date": "2025-12-30", "count": 0}, {"date": "2025-12-31", "count": 0}, {"date": "2026-01-01", "count": 0}, {"date": "2026-01-02", "count": 0}, {"date": "2026-01-03", "count": 0}, {"date": "2026-01-04", "count": 0}, {"date": "2026-01-05", "count": 0}, {"date": "2026-01-06", "count": 0}, {"date": "2026-01-07", "count": 0}, {"date": "2026-01-08", "count": 0}, {"date": "2026-01-09", "count": 1}, {"date": "2026-01-10", "count": 0}, {"date": "2026-01-11", "count": 1}, {"date": "2026-01-12", "count": 0}, {"date": "2026-01-13", "count": 0}, {"date": "2026-01-14", "count": 0}, {"date": "2026-01-15", "count": 0}, {"date": "2026-01-16", "count": 0}, {"date": "2026-01-17", "count": 0}, {"date": "2026-01-18", "count": 0}, {"date": "2026-01-19", "count": 0}, {"date": "2026-01-20", "count": 0}, {"date": "2026-01-21", "count": 0}, {"date": "2026-01-22", "count": 0}, {"date": "2026-01-23", "count": 1}, {"date": "2026-01-24", "count": 0}, {"date": "2026-01-25", "count": 0}, {"date": "2026-01-26", "count": 0}, {"date": "2026-01-27", "count": 0}, {"date": "2026-01-28", "count": 0}, {"date": "2026-01-29", "count": 0}, {"date": "2026-01-30", "count": 0}, {"date": "2026-01-31", "count": 0}, {"date": "2026-02-01", "count": 0}, {"date": "2026-02-02", "count": 0}, {"date": "2026-02-03", "count": 0}, {"date": "2026-02-04", "count": 0}, {"date": "2026-02-05", "count": 0}, {"date": "2026-02-06", "count": 0}, {"date": "2026-02-07", "count": 0}, {"date": "2026-02-08", "count": 0}, {"date": "2026-02-09", "count": 0}, {"date": "2026-02-10", "count": 2}, {"date": "2026-02-11", "count": 0}, {"date": "2026-02-12", "count": 3}, {"date": "2026-02-13", "count": 0}, {"date": "2026-02-14", "count": 0}, {"date": "2026-02-15", "count": 2}, {"date": "2026-02-16", "count": 0}, {"date": "2026-02-17", "count": 1}, {"date": "2026-02-18", "count": 0}, {"date": "2026-02-19", "count": 2}, {"date": "2026-02-20", "count": 1}, {"date": "2026-02-21", "count": 2}, {"date": "2026-02-22", "count": 0}, {"date": "2026-02-23", "count": 0}, {"date": "2026-02-24", "count": 0}, {"date": "2026-02-25", "count": 1}, {"date": "2026-02-26", "count": 0}, {"date": "2026-02-27", "count": 0}, {"date": "2026-02-28", "count": 0}, {"date": "2026-03-01", "count": 0}, {"date": "2026-03-02", "count": 0}, {"date": "2026-03-03", "count": 0}, {"date": "2026-03-04", "count": 0}, {"date": "2026-03-05", "count": 0}, {"date": "2026-03-06", "count": 0}, {"date": "2026-03-07", "count": 0}, {"date": "2026-03-08", "count": 0}, {"date": "2026-03-09", "count": 0}, {"date": "2026-03-10", "count": 0}, {"date": "2026-03-11", "count": 0}, {"date": "2026-03-12", "count": 0}, {"date": "2026-03-13", "count": 0}, {"date": "2026-03-14", "count": 0}, {"date": "2026-03-15", "count": 0}, {"date": "2026-03-16", "count": 0}, {"date": "2026-03-17", "count": 0}, {"date": "2026-03-18", "count": 0}, {"date": "2026-03-19", "count": 0}, {"date": "2026-03-20", "count": 0}, {"date": "2026-03-21", "count": 0}, {"date": "2026-03-22", "count": 0}, {"date": "2026-03-23", "count": 0}, {"date": "2026-03-24", "count": 1}, {"date": "2026-03-25", "count": 0}, {"date": "2026-03-26", "count": 0}, {"date": "2026-03-27", "count": 2}, {"date": "2026-03-28", "count": 0}, {"date": "2026-03-29", "count": 0}, {"date": "2026-03-30", "count": 0}, {"date": "2026-03-31", "count": 2}, {"date": "2026-04-01", "count": 1}, {"date": "2026-04-02", "count": 1}, {"date": "2026-04-03", "count": 0}, {"date": "2026-04-04", "count": 0}, {"date": "2026-04-05", "count": 0}, {"date": "2026-04-06", "count": 1}, {"date": "2026-04-07", "count": 0}, {"date": "2026-04-08", "count": 0}, {"date": "2026-04-09", "count": 0}, {"date": "2026-04-10", "count": 0}, {"date": "2026-04-11", "count": 0}, {"date": "2026-04-12", "count": 0}, {"date": "2026-04-13", "count": 0}, {"date": "2026-04-14", "count": 0}, {"date": "2026-04-15", "count": 0}, {"date": "2026-04-16", "count": 2}, {"date": "2026-04-17", "count": 0}, {"date": "2026-04-18", "count": 0}, {"date": "2026-04-19", "count": 1}, {"date": "2026-04-20", "count": 2}, {"date": "2026-04-21", "count": 1}, {"date": "2026-04-22", "count": 0}, {"date": "2026-04-23", "count": 2}, {"date": "2026-04-24", "count": 1}, {"date": "2026-04-25", "count": 0}, {"date": "2026-04-26", "count": 0}, {"date": "2026-04-27", "count": 0}];
+  const container = document.getElementById("contribChart");
+  const tooltip = document.getElementById("tooltip");
+  let html = "<div class='contrib-grid'>";
+  let weekHtml = "";
+  const firstDate = new Date(data[0].date);
+  const firstDay = firstDate.getDay();
+  const offset = firstDay === 0 ? 6 : firstDay - 1;
+  for(let i=0; i<offset; i++){ weekHtml += "<div class='contrib-day' style='background:transparent;'></div>"; }
+  data.forEach((d, idx) => {
+    const colors = ["#161b22","#0e4429","#006d32","#26a641","#39d353"];
+    const level = Math.min(d.count, 4);
+    const color = colors[level];
+    weekHtml += `<div class="contrib-day" style="background:${color};" data-date="${d.date}" data-count="${d.count}"></div>`;
+    const date = new Date(d.date);
+    const day = date.getDay();
+    if(day === 0 || idx === data.length - 1){
+      html += "<div class='contrib-week'>" + weekHtml + "</div>";
+      weekHtml = "";
+    }
+  });
+  if(weekHtml) html += "<div class='contrib-week'>" + weekHtml + "</div>";
+  html += "</div>";
+  container.innerHTML = html;
+  container.querySelectorAll(".contrib-day[data-date]").forEach(day => {
+    day.addEventListener("mouseenter", (e) => {
+      tooltip.innerHTML = `<strong>${e.target.dataset.date}</strong><br/>贡献: ${e.target.dataset.count} 次`;
+      tooltip.style.display = "block";
+    });
+    day.addEventListener("mousemove", (e) => {
+      tooltip.style.left = (e.clientX + 12) + "px";
+      tooltip.style.top = (e.clientY - 30) + "px";
+    });
+    day.addEventListener("mouseleave", () => { tooltip.style.display = "none"; });
+  });
+}
+renderContrib();
+const chartColors = {
+  primary: "#3b82f6", secondary: "#8b5cf6", success: "#10b981", warning: "#f59e0b", danger: "#ef4444", info: "#06b6d4",
+  muted: "#94a3b8", grid: "#2d3a52", bg: "#151e32"
+};
+new Chart(document.getElementById("radarChart"), {
+  type: "radar",
+  data: {
+    labels: ["原创数量", "Fork数量", "Stars总数", "活跃Issue", "PR贡献", "语言多样性"],
+    datasets: [{ label: "运营数据", data: [15, 15, 23, 2, 5, 6], backgroundColor: "rgba(59,130,246,0.2)", borderColor: "#3b82f6", pointBackgroundColor: "#3b82f6", pointBorderColor: "#fff", pointHoverBackgroundColor: "#fff", pointHoverBorderColor: "#3b82f6", borderWidth: 2 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: { r: { angleLines: { color: chartColors.grid }, grid: { color: chartColors.grid }, pointLabels: { color: chartColors.muted, font: { size: 11 } }, ticks: { color: chartColors.muted, backdropColor: "transparent" } } }
+  }
+});
+new Chart(document.getElementById("langChart"), {
+  type: "doughnut",
+  data: {
+    labels: ["JavaScript", "Makefile", "Python", "Vue", "Java", "SCSS"],
+    datasets: [{ data: [2, 1, 3, 2, 3, 1], backgroundColor: ["#3b82f6","#8b5cf6","#10b981","#06b6d4","#f59e0b","#ef4444"], borderColor: "#151e32", borderWidth: 3, hoverOffset: 10 }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { position: "right", labels: { color: chartColors.muted } } },
+    cutout: "50%"
+  }
+});
+new Chart(document.getElementById("trendChart"), {
+  type: "bar",
+  data: {
+    labels: ["2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03", "2026-04"],
+    datasets: [
+      { label: "发布数量", type: "bar",
+        data: [1, 1, 1, 1, 9, 5, 12],
+        backgroundColor: "rgba(59,130,246,0.7)", borderColor: "#3b82f6", borderWidth: 1, borderRadius: 6, barPercentage: 0.5 },
+      { label: "模拟访客量", type: "line",
+        data: [84, 33, 16, 155, 368, 165, 195],
+        borderColor: "#10b981", backgroundColor: "rgba(16,185,129,0.1)", borderWidth: 3, fill: true, tension: 0.4,
+        pointRadius: 5, pointBackgroundColor: "#10b981", pointBorderColor: "#fff", pointBorderWidth: 2, yAxisID: "y1" }
+    ]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { labels: { color: chartColors.muted } } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: chartColors.muted } },
+      y: { type: "linear", display: true, position: "left", grid: { color: chartColors.grid }, ticks: { color: chartColors.muted } },
+      y1: { type: "linear", display: true, position: "right", grid: { display: false }, ticks: { color: chartColors.muted } }
+    }
+  }
+});
+new Chart(document.getElementById("starChart"), {
+  type: "bar",
+  data: {
+    labels: ["roscar-first", "roscar-second", "cs-review", "xyls-smartgroup-clash", "pretext2", "zhize-lab-blog", "math-code", "wechat-manage", "app-wechat-page", "java-spring-boot-data", "java-web-news", "new-web-java", "new-springboot-zhizelab", "web-zhizelabwithbackend-xyls", "java-zhizelab-backend-xyls", "openclaw", "spring-boot-projects", "claude-code-sourcemap"],
+    datasets: [{
+      label: "Stars",
+      data: [2, 2, 2, 2, 2, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1],
+      backgroundColor: function(ctx) {
+        const isFork = [false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, true, true, true][ctx.dataIndex];
+        return isFork ? "rgba(245,158,11,0.7)" : "rgba(59,130,246,0.7)";
+      },
+      borderColor: function(ctx) {
+        const isFork = [false, false, false, false, true, false, false, false, false, false, false, false, false, false, false, true, true, true][ctx.dataIndex];
+        return isFork ? "#f59e0b" : "#3b82f6";
+      },
+      borderWidth: 1, borderRadius: 6
+    }]
+  },
+  options: {
+    indexAxis: "y",
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: chartColors.grid }, ticks: { color: chartColors.muted } },
+      y: { grid: { display: false }, ticks: { color: chartColors.muted } }
+    }
+  }
+});
+new Chart(document.getElementById("sizeChart"), {
+  type: "bar",
+  data: {
+    labels: ["Paddle", "openclaw", "KuiperInfer", "SillyTavern", "vllm", "web-zhizelabwithbackend-xyls", "roscar-second", "math-code", "pretext", "claude-code-sourcemap", "chiken-detect", "roscar-first", "spring-boot-projects", "zhize-lab-blog", "vnt"],
+    datasets: [{
+      label: "大小 (KB)",
+      data: [548810, 345757, 325017, 214042, 194828, 141708, 135529, 112390, 95960, 73856, 54104, 37189, 14626, 12923, 3677],
+      backgroundColor: "rgba(139,92,246,0.7)", borderColor: "#8b5cf6",
+      borderWidth: 1, borderRadius: 6
+    }]
+  },
+  options: {
+    indexAxis: "y",
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { color: chartColors.grid }, ticks: { color: chartColors.muted, callback: function(v){return v>=1024?(v/1024).toFixed(1)+"MB":v+"KB";} } },
+      y: { grid: { display: false }, ticks: { color: chartColors.muted, font: { size: 10 } } }
+    }
+  }
+});
+new Chart(document.getElementById("weekdayChart"), {
+  type: "bar",
+  data: {
+    labels: ["周一", "周二", "周三", "周四", "周五", "周六", "周日"],
+    datasets: [{
+      label: "发布数",
+      data: [3, 6, 3, 7, 6, 2, 3],
+      backgroundColor: ["#3b82f6","#8b5cf6","#10b981","#06b6d4","#f59e0b","#ef4444","#ec4899"],
+      borderRadius: 8, borderWidth: 0
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: chartColors.muted } },
+      y: { grid: { color: chartColors.grid }, ticks: { color: chartColors.muted } }
+    }
+  }
+});
+new Chart(document.getElementById("topicChart"), {
+  type: "bar",
+  data: {
+    labels: [],
+    datasets: [{
+      label: "出现次数",
+      data: [],
+      backgroundColor: "rgba(6,182,212,0.7)", borderColor: "#06b6d4",
+      borderWidth: 1, borderRadius: 6
+    }]
+  },
+  options: {
+    responsive: true, maintainAspectRatio: false,
+    plugins: { legend: { display: false } },
+    scales: {
+      x: { grid: { display: false }, ticks: { color: chartColors.muted, maxRotation: 45, font: { size: 10 } } },
+      y: { grid: { color: chartColors.grid }, ticks: { color: chartColors.muted } }
+    }
+  }
+});
+let sortDir = {};
+function sortTable(colIndex) {
+  const tbody = document.getElementById("tableBody");
+  const rows = Array.from(tbody.querySelectorAll("tr"));
+  sortDir[colIndex] = !sortDir[colIndex];
+  const dir = sortDir[colIndex] ? 1 : -1;
+  rows.sort((a, b) => {
+    let aVal = a.cells[colIndex].innerText.trim();
+    let bVal = b.cells[colIndex].innerText.trim();
+    const aNum = parseFloat(aVal.replace(/[^0-9.-]/g, ""));
+    const bNum = parseFloat(bVal.replace(/[^0-9.-]/g, ""));
+    if(!isNaN(aNum) && !isNaN(bNum) && aVal !== "" && bVal !== ""){
+      return (aNum - bNum) * dir;
+    }
+    return aVal.localeCompare(bVal, "zh-CN") * dir;
+  });
+  rows.forEach(r => tbody.appendChild(r));
+}
+const searchInput = document.getElementById("searchInput");
+const typeFilter = document.getElementById("typeFilter");
+function filterTable() {
+  const query = searchInput.value.toLowerCase();
+  const type = typeFilter.value;
+  const tbody = document.getElementById("tableBody");
+  const rows = tbody.querySelectorAll("tr");
+  rows.forEach(row => {
+    const rowType = row.dataset.type;
+    const searchData = row.dataset.search;
+    row.style.display = (type === "all" || rowType === type) && (!query || searchData.includes(query)) ? "" : "none";
+  });
+}
+searchInput.addEventListener("input", filterTable);
+typeFilter.addEventListener("change", filterTable);
+</script>
+</body>
+</html>
